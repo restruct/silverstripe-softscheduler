@@ -1,0 +1,20 @@
+.cms table.ss-gridfield-table tr td .btn-icon-sprite {
+  width: 16px;
+  height: 16px;
+  display: block;
+  float: left;
+  margin-right: 6px;
+}
+
+.cms-tree.jstree-apple span.badge.status-status-scheduled, 
+.cms-tree.jstree-apple span.badge.status-status-expired {
+	color: #7E7470;
+	border: 1px solid #C9B800;
+	background-color: #FFF0BC;
+}
+
+#Form_EditForm_SoftScheduler { max-width: 698px; }
+#Form_EditForm_SoftScheduler.ss-toggle .ui-accordion-content .field label { float: left; }
+#Form_EditForm_SoftScheduler .field label.left { width: 150px; }
+#Form_EditForm_SoftScheduler .fieldgroup .fieldgroup-field { margin-top: -4px; }
+#Form_EditForm_SoftScheduler.ss-toggle .ui-accordion-content .field label.right { margin-left: 170px; }

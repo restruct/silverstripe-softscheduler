@@ -1,0 +1,22 @@
+{
+    "name": "restruct/silverstripe-softscheduler",
+    "description": "Adds a very simple way to schedule (Embargo/Expire) SiteTree items",
+    "type": "silverstripe-vendormodule",
+    "keywords": ["silverstripe", "embargo", "expiry", "sitetree", "schedule"],
+    "authors": [
+    {
+        "name": "restruct",
+        "email": "apps@restruct.nl"
+    }],
+    "require": {
+        "silverstripe/framework": "^4.3"
+    },
+	"extra": {
+        "expose": [
+            "client/images",
+            "client/dist/css"
+        ],
+		"installer-name": "softscheduler"
+	}
+
+}
