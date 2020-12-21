@@ -1,7 +1,7 @@
 <?php
 
 
-namespace Restruct\SoftScheduler\Extensions {
+namespace Restruct\SilverStripe\SoftScheduler {
 
     use SilverStripe\Admin\LeftAndMain;
     use SilverStripe\CMS\Model\SiteTreeExtension;
