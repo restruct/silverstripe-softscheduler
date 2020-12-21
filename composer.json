@@ -3,6 +3,7 @@
     "description": "Adds a very simple way to schedule (Embargo/Expire) SiteTree items",
     "type": "silverstripe-vendormodule",
     "keywords": ["silverstripe", "embargo", "expiry", "sitetree", "schedule"],
+    "license": "MIT",
     "authors": [
     {
         "name": "restruct",
