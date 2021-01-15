@@ -304,8 +304,8 @@ namespace Restruct\SilverStripe\SoftScheduler {
         public function augmentSQL(SQLSelect $query, DataQuery $dataQuery = null)
             //public function augmentSQL(&$query)
         {
-            parent::augmentSQL();
-            $stage = Versioned::current_stage();
+            parent::augmentSQL($query, $dataQuery);
+            $stage = Versioned::get_stage();
             if ( Controller::curr() instanceof LeftAndMain ) {
                 return;
             }
