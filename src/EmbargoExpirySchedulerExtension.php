@@ -45,30 +45,24 @@ namespace Restruct\SilverStripe\SoftScheduler {
          */
         public function updateCMSFields(FieldList $fields)
         {
-            //Requirements::css(SCHEDULER_DIR . "/css/cms.css");
 
-
-//		$fields->insertBefore(
             $publishDate = DatetimeField::create("Embargo", _t("Scheduler.Embargo", "Page available from"));
-//			"Content"
-//		);
-            $publishDate->getDateField()->setConfig('dateformat', 'dd-MM-yyyy');
-            $publishDate->getDateField()->setConfig("showcalendar", true);
-            $publishDate->getTimeField()->setConfig('timeformat', 'HH:mm');
-            $publishDate->getTimeField()->setAttribute('placeholder', '00:00');
+            $publishDate->setDatetimeFormat('dd-MM-yyyy HH:mm');
+            //$publishDate->getDateField()->setConfig('dateformat', 'dd-MM-yyyy');
+            //$publishDate->getDateField()->setConfig("showcalendar", true);
+            //$publishDate->getTimeField()->setConfig('timeformat', 'HH:mm');
+            //$publishDate->getTimeField()->setAttribute('placeholder', '00:00');
             //$publishDate->getTimeField()->setValue("13:00");
-            $publishDate->setRightTitle(_t("Scheduler.LeaveEmptyEmbargo",
+            $publishDate->setDescription(_t("Scheduler.LeaveEmptyEmbargo",
                 "Leave empty to have page available right away (after publishing)"));
 
-//		$fields->insertAfter(
             $unpublishDate = DatetimeField::create("Expiry", _t("Scheduler.Expiry", "Page expires on"));
-//			"Embargo"
-//		);
-            $unpublishDate->getDateField()->setConfig('dateformat', 'dd-MM-yyyy');
-            $unpublishDate->getDateField()->setConfig("showcalendar", true);
-            $unpublishDate->getTimeField()->setConfig('timeformat', 'HH:mm');
-            $unpublishDate->getTimeField()->setAttribute('placeholder', '00:00');
-            $unpublishDate->setRightTitle(_t("Scheduler.LeaveEmptyExpire",
+            $unpublishDate->setDatetimeFormat('dd-MM-yyyy HH:mm');
+            //$unpublishDate->getDateField()->setConfig('dateformat', 'dd-MM-yyyy');
+            //$unpublishDate->getDateField()->setConfig("showcalendar", true);
+            //$unpublishDate->getTimeField()->setConfig('timeformat', 'HH:mm');
+            //$unpublishDate->getTimeField()->setAttribute('placeholder', '00:00');
+            $unpublishDate->setDescription(_t("Scheduler.LeaveEmptyExpire",
                 "Leave empty to leave page published indefinitely"));
 
             $fields->insertBefore(ToggleCompositeField::create(
