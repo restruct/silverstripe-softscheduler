@@ -1,3 +1,0 @@
-SilverStripe\Admin\LeftAndMain:
-  extra_requirements_css:
-    - 'restruct/silverstripe-softscheduler:client/dist/css/styles.css'
