@@ -4,11 +4,7 @@
     "type": "silverstripe-vendormodule",
     "keywords": ["silverstripe", "embargo", "expiry", "sitetree", "schedule"],
     "license": "MIT",
-    "authors": [
-    {
-        "name": "restruct",
-        "email": "apps@restruct.nl"
-    }],
+    "authors": [ { "name": "Restruct", "email": "dev@restruct.nl", "homepage": "https://restruct.nl" } ],
     "require": {
         "silverstripe/framework": "^4.3"
     },
