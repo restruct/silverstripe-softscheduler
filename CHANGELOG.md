@@ -14,8 +14,9 @@ Requires PHP `^8.1`, `silverstripe/framework ^5 || ^6` and `silverstripe/cms ^5 
 - The extension now extends `SilverStripe\Core\Extension`; `SiteTreeExtension` is removed in
   Silverstripe 6. The class name, `Restruct\SilverStripe\SoftScheduler\EmbargoExpiryExtension`, is
   unchanged.
-- `composer.json` declares PSR-4 autoloading, a `funding` entry and a `3.x-dev` branch alias, and the
-  repository has an MIT `LICENSE` file to match the licence it already declared.
+- `composer.json` declares PSR-4 autoloading, a `funding` entry and a `3.x-dev` branch alias for
+  `main`, the default branch (renamed from `master`). The repository has an MIT `LICENSE` file to match
+  the licence it already declared, naming both copyright holders in its history.
 
 ### Fixed
 
@@ -46,10 +47,13 @@ Requires PHP `^8.1`, `silverstripe/framework ^5 || ^6` and `silverstripe/cms ^5 
   now produced by the `contentcontrollerInit` hook; the old code is kept, commented out, in the class.
 - `.travis.yml`, a Silverstripe 3 configuration that targeted a tests directory that no longer
   existed. CI runs on GitHub Actions.
+- `.scrutinizer.yml`, which filtered a `code/` directory that no longer exists.
+- `client/dist/css/styles.css`, which was exposed but never loaded; its selectors targeted the
+  Silverstripe 3 CMS. The site tree's Scheduled and Expired badges use the CMS's own badge style.
 
 ### Added
 
-- A test suite (19 tests, identical on Silverstripe 5 and 6) with a regression test for each fix
+- A test suite (21 tests, identical on Silverstripe 5 and 6) with a regression test for each fix
   above, and a GitHub Actions matrix: Silverstripe 5 on PHP 8.1 and 8.3, Silverstripe 6 on PHP 8.3
   and 8.4.
 - README: what the module does for whom, the public API, limitations, version compatibility and how
