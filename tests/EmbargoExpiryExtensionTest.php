@@ -15,6 +15,7 @@ use SilverStripe\Forms\ToggleCompositeField;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DataObjectSchema;
 use SilverStripe\ORM\FieldType\DBDatetime;
+use SilverStripe\Security\Group;
 use SilverStripe\Security\InheritedPermissions;
 use SilverStripe\Versioned\Versioned;
 
@@ -328,6 +329,24 @@ class EmbargoExpiryExtensionTest extends SapphireTest
 
         $this->logInWithPermission('SOME_UNRELATED_PERMISSION');
         $this->assertTrue($restricted->canView(), 'A logged-in member may');
+    }
+
+    /**
+     * Same defect, draft-viewer branch: VIEW_DRAFT_CONTENT lets a member see scheduled pages, but it
+     * must not also lift a page's viewer-group restriction (it answered true there as well).
+     */
+    public function testCanViewDoesNotLetDraftViewersPastViewerGroups()
+    {
+        $group = Group::create(['Title' => 'Insiders']);
+        $group->write();
+        $restricted = $this->publishedPage('insiders', null, null, [
+            'CanViewType' => InheritedPermissions::ONLY_THESE_USERS,
+        ]);
+        $restricted->ViewerGroups()->add($group);
+
+        $this->logInWithPermission('VIEW_DRAFT_CONTENT');
+
+        $this->assertFalse($restricted->canView());
     }
 
     /**

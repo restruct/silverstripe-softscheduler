@@ -49,7 +49,7 @@ Requires PHP `^8.1`, `silverstripe/framework ^5 || ^6` and `silverstripe/cms ^5 
 
 ### Added
 
-- A test suite (18 tests, identical on Silverstripe 5 and 6) with a regression test for each fix
+- A test suite (19 tests, identical on Silverstripe 5 and 6) with a regression test for each fix
   above, and a GitHub Actions matrix: Silverstripe 5 on PHP 8.1 and 8.3, Silverstripe 6 on PHP 8.3
   and 8.4.
 - README: what the module does for whom, the public API, limitations, version compatibility and how
