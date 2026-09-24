@@ -4,7 +4,7 @@
 namespace Restruct\SilverStripe\SoftScheduler;
 
 use SilverStripe\Admin\LeftAndMain;
-use SilverStripe\CMS\Model\SiteTreeExtension;
+use SilverStripe\Core\Extension;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\Director;
 use SilverStripe\ErrorPage\ErrorPage;
@@ -30,7 +30,10 @@ use SilverStripe\View\Requirements;
  * @author  Michael van Schaik, partly based on Embargo/Expiry module by Simon Welsh
  * Some parts also extracted from micmania1/silverstripe-blogger
  */
-class EmbargoExpiryExtension extends SiteTreeExtension
+# Extension, not SiteTreeExtension: SiteTreeExtension is deprecated in Silverstripe 5.3 and removed in 6,
+# while Extension is the base class on both majors (its private statics such as $db are still merged into
+# the owner's config by ExtensionMiddleware).
+class EmbargoExpiryExtension extends Extension
 {
     private static $db = [
         'Embargo' => DBDatetime::class,
@@ -237,9 +240,11 @@ class EmbargoExpiryExtension extends SiteTreeExtension
         return true;
     }
 
-    public function augmentSQL(SQLSelect $query, DataQuery $dataQuery = null)
+    # ?DataQuery: an implicitly nullable parameter is deprecated as of PHP 8.4
+    public function augmentSQL(SQLSelect $query, ?DataQuery $dataQuery = null)
     {
-        parent::augmentSQL($query, $dataQuery);
+        # Extension has no augmentSQL(); the DataExtension/SiteTreeExtension parent was an empty stub
+//        parent::augmentSQL($query, $dataQuery);
         $stage = Versioned::get_stage();
         if ( Controller::curr() instanceof LeftAndMain ) {
             return;
