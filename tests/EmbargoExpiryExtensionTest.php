@@ -388,8 +388,9 @@ class EmbargoExpiryExtensionTest extends SapphireTest
     /**
      * Regression: canView($member) must answer for the member it is asked about. It used to check the
      * CURRENT user's VIEW_DRAFT_CONTENT, so code asking about another member while an editor is logged
-     * in (a per-recipient digest, a sitemap built in an editor's session) saw scheduled and expired
-     * pages as viewable for that member.
+     * in (a front-end request that asks about another member) saw scheduled and expired pages as
+     * viewable for that member. The dates only deny access under a ContentController, so this does not
+     * cover a CMS action or a CLI/queue job: there the extension abstains and canView() stays true.
      */
     public function testCanViewAnswersForTheMemberPassedInNotTheCurrentUser()
     {

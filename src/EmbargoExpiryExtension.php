@@ -291,7 +291,9 @@ class EmbargoExpiryExtension extends Extension
     {
         # has_curr() is deprecated in framework 5.4 through noticeWithNoReplacment(), which wraps the notice in
         # withSuppressedNotice(): it is only output with Deprecation::enable(true), and de-duplicated per
-        # message, so at most one line per process - not one per query. There is no non-deprecated way on 5
+        # message, so at most one line per process - not one per query. With deprecations enabled, notice()
+        # still runs debug_backtrace() on every call, so once per filtered query: a dev-only cost, no extra
+        # output. There is no non-deprecated way on 5
         # to ask for the controller without the warning, so the call stays.
         if ( method_exists(Controller::class, 'has_curr') && !Controller::has_curr() ) {
             return null;
