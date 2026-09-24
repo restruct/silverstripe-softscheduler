@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    # master is this repository's default branch today; main is the portfolio convention it is due to
-    # be renamed to. Both are listed so the rename does not silently switch CI off.
-    branches: [master, main]
+    # main is the default branch (renamed from master with the 3.0 release). Other branches are
+    # tested through pull requests.
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -119,9 +119,10 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <!-- Warning-to-error escalation is the RUNNER's behaviour and differs by PHPUnit
                major: 9 (SS5) converts warnings by default, 11 (SS6) has no such attribute.
-               failOnWarning is pinned so a warning behaves identically on every leg. -->
+               failOnWarning is pinned so a warning behaves identically on every leg.
+               failOnEmptyTestSuite backs up the CLI flag for anyone running this file by hand. -->
           <phpunit bootstrap="vendor/silverstripe/framework/tests/bootstrap.php" colors="true"
-                   failOnWarning="true">
+                   failOnWarning="true" failOnEmptyTestSuite="true">
               <testsuites>
                   <testsuite name="softscheduler">
                       <directory>vendor/restruct/silverstripe-softscheduler/tests</directory>
