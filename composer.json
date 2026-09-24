@@ -27,8 +27,7 @@
     },
 	"extra": {
         "expose": [
-            "client/images",
-            "client/dist/css"
+            "client/images"
         ],
 		"installer-name": "softscheduler",
         "branch-alias": {
