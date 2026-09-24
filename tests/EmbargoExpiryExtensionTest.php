@@ -4,6 +4,7 @@ namespace Restruct\SoftScheduler\Tests;
 
 use Restruct\SilverStripe\SoftScheduler\EmbargoExpiryExtension;
 use Restruct\SoftScheduler\Tests\Stub\SchedPage;
+use SilverStripe\Admin\LeftAndMain;
 use SilverStripe\CMS\Controllers\ContentController;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
@@ -17,6 +18,7 @@ use SilverStripe\ORM\DataObjectSchema;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Security\Group;
 use SilverStripe\Security\InheritedPermissions;
+use SilverStripe\Security\Member;
 use SilverStripe\Versioned\Versioned;
 
 /**
@@ -381,5 +383,57 @@ class EmbargoExpiryExtensionTest extends SapphireTest
         $scheduled = $this->publishedPage('scheduled', '2030-07-01 00:00:00', null);
 
         $this->assertTrue($scheduled->canView());
+    }
+
+    /**
+     * Regression: canView($member) must answer for the member it is asked about. It used to check the
+     * CURRENT user's VIEW_DRAFT_CONTENT, so code asking about another member while an editor is logged
+     * in (a per-recipient digest, a sitemap built in an editor's session) saw scheduled and expired
+     * pages as viewable for that member.
+     */
+    public function testCanViewAnswersForTheMemberPassedInNotTheCurrentUser()
+    {
+        $scheduled = $this->publishedPage('scheduled', '2030-07-01 00:00:00', null);
+        $visitor = Member::create(['FirstName' => 'Visitor', 'Email' => 'visitor@example.com']);
+        $visitor->write();
+
+        # The logged-in editor may see the scheduled page; the member passed in, who lacks the
+        # permission, may not
+        $this->logInWithPermission('VIEW_DRAFT_CONTENT');
+        $this->onFrontEnd(function () use ($scheduled, $visitor) {
+            $this->assertTrue($scheduled->canView(), 'The logged-in draft viewer may');
+            $this->assertFalse($scheduled->canView($visitor), 'The member asked about may not');
+        });
+    }
+
+    /**
+     * Inside the CMS (a LeftAndMain controller on the stack) nothing is filtered or denied, also on the
+     * Live stage and for CMS users without VIEW_DRAFT_CONTENT: the site tree and GridFields must list
+     * scheduled and expired pages so editors can find and change them.
+     */
+    public function testNothingIsHiddenInsideTheCms()
+    {
+        $scheduled = $this->publishedPage('scheduled', '2030-07-01 00:00:00', null);
+        $this->publishedPage('expired', null, '2030-06-01 00:00:00');
+        $this->publishedPage('plain', null, null);
+
+        $this->logInWithPermission('CMS_ACCESS_CMSMain');
+
+        $request = new HTTPRequest('GET', '/admin/pages');
+        $request->setSession(new Session([]));
+        $cms = LeftAndMain::create();
+        $cms->setRequest($request);
+        $cms->pushCurrent();
+        try {
+            $segments = $this->inStage(Versioned::LIVE, function () {
+                return SchedPage::get()->sort('URLSegment')->column('URLSegment');
+            });
+            $canView = $scheduled->canView();
+        } finally {
+            $cms->popCurrent();
+        }
+
+        $this->assertSame(['expired', 'plain', 'scheduled'], $segments);
+        $this->assertTrue($canView);
     }
 }
