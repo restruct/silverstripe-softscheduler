@@ -4,10 +4,11 @@
 namespace Restruct\SilverStripe\SoftScheduler;
 
 use SilverStripe\Admin\LeftAndMain;
-use SilverStripe\CMS\Model\SiteTreeExtension;
+use SilverStripe\CMS\Controllers\ContentController;
+use SilverStripe\Core\Extension;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\Director;
-use SilverStripe\ErrorPage\ErrorPage;
+//use SilverStripe\ErrorPage\ErrorPage;
 use SilverStripe\Forms\DatetimeField;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\ToggleCompositeField;
@@ -30,7 +31,10 @@ use SilverStripe\View\Requirements;
  * @author  Michael van Schaik, partly based on Embargo/Expiry module by Simon Welsh
  * Some parts also extracted from micmania1/silverstripe-blogger
  */
-class EmbargoExpiryExtension extends SiteTreeExtension
+# Extension, not SiteTreeExtension: SiteTreeExtension is deprecated in Silverstripe 5.3 and removed in 6,
+# while Extension is the base class on both majors (its private statics such as $db are still merged into
+# the owner's config by ExtensionMiddleware).
+class EmbargoExpiryExtension extends Extension
 {
     private static $db = [
         'Embargo' => DBDatetime::class,
@@ -50,7 +54,9 @@ class EmbargoExpiryExtension extends SiteTreeExtension
         $unpublishDate = DatetimeField::create("Expiry", _t("Scheduler.Expiry", "Page expires on"))
             ->setDescription(_t("Scheduler.LeaveEmptyExpire", "Leave empty to leave page published indefinitely"));
 
+        # insertBefore(name, field): the (field, name) order of Silverstripe 3 is a TypeError on 5 and 6
         $fields->insertBefore(
+            'Content',
             ToggleCompositeField::create(
                 'SoftScheduler',
                 _t('SoftScheduler.Schedule', 'Schedule publishing & unpublishing of this page'),
@@ -61,8 +67,6 @@ class EmbargoExpiryExtension extends SiteTreeExtension
             )
                 ->setHeadingLevel(4)
                 ->addExtraClass('stacked')
-            ,
-            'Content'
         );
     }
 
@@ -200,54 +204,146 @@ class EmbargoExpiryExtension extends SiteTreeExtension
      */
     public function canView($member = null)
     {
+        # This hook only ever DENIES. It abstains (null) where it used to return true, because
+        # DataObject::extendedCan() lets any non-null extension answer override the page's own checks:
+        # returning true made a page restricted to logged-in users or to specific groups viewable by
+        # anyone, merely because this extension was applied to its class.
+
         // if CMS user with sufficient rights:
-        if ( Permission::check("VIEW_DRAFT_CONTENT") ) {
+        # checkMember() honours the $member being asked about; with no $member it uses the current user
+        if ( Permission::checkMember($member, "VIEW_DRAFT_CONTENT") ) {
             //if(Permission::checkMember($member, 'VIEW_EMBARGOEXPIRY')) {
-            return true;
+//            return true;
+            return null;
         }
 
         // if on front, controller should be a subclass of ContentController (ties it to CMS, = ok...)
-        $ctr = Controller::curr();
-        if ( is_subclass_of($ctr, "ContentController") ) {
+        # Compared by class, not by the unqualified string "ContentController": that string never matched
+        # the namespaced class, so this branch never ran on Silverstripe 4 and later.
+        $ctr = self::currentController();
+//        if ( is_subclass_of($ctr, "ContentController") ) {
+        if ( $ctr instanceof ContentController ) {
             if ( $this->owner->getScheduledStatus() || $this->owner->getExpiredStatus() ) {
 
-                // if $this->owner is the actual page being visited (Director::get_current_page());
-                $curpage = Director::get_current_page();
-                if ( $curpage->ID == $this->owner->ID ) {
-                    // we have to prevent visitors from actually visiting this page by redirecting to a 404
-                    // This is a bit of a hack (redirect), but else visitors will be presented with a
-                    // 'login' screen in order to acquire sufficient privileges to view the page)
-                    $errorPage = ErrorPage::get()->filter('ErrorCode', 404)->first();
-                    if ( $errorPage ) {
-                        $ctr->redirect($errorPage->Link(), 404);
-                    } else {
-                        // fallback (hack): redirect to anywhere, with a 404
-                        $ctr->redirect(rtrim($this->owner->Link(), '/') . "-404", 404);
-                        //$ctr->redirect(Page::get()->first()->Link(), 404);
-                    }
-                }
+                # Visiting the page itself is answered with a 404 by contentcontrollerInit() below, which runs
+                # before ContentController checks canView(). The redirect that used to live here could not
+                # work: HTTPResponse::redirect() rejects 404 as a redirect code (warning, falls back to 302),
+                # and the false returned below then made ContentController replace the response with
+                # Security::permissionFailure(), i.e. the login screen this was meant to avoid.
+//                // if $this->owner is the actual page being visited (Director::get_current_page());
+//                $curpage = Director::get_current_page();
+//                if ( $curpage->ID == $this->owner->ID ) {
+//                    // we have to prevent visitors from actually visiting this page by redirecting to a 404
+//                    // This is a bit of a hack (redirect), but else visitors will be presented with a
+//                    // 'login' screen in order to acquire sufficient privileges to view the page)
+//                    $errorPage = ErrorPage::get()->filter('ErrorCode', 404)->first();
+//                    if ( $errorPage ) {
+//                        $ctr->redirect($errorPage->Link(), 404);
+//                    } else {
+//                        // fallback (hack): redirect to anywhere, with a 404
+//                        $ctr->redirect(rtrim($this->owner->Link(), '/') . "-404", 404);
+//                        //$ctr->redirect(Page::get()->first()->Link(), 404);
+//                    }
+//                }
 
+                # Deny: hides the page from menus and other canView()-filtered lists on the front end
                 return false;
-            } else {
-                return true;
+//            } else {
+//                return true;
             }
         }
 
         // else, allow
-        return true;
+        # ...by abstaining, so the page's own CanViewType/ViewerGroups settings decide
+//        return true;
+        return null;
     }
 
-    public function augmentSQL(SQLSelect $query, DataQuery $dataQuery = null)
+    /**
+     * Answer a request for a scheduled or expired page with a 404, for visitors without VIEW_DRAFT_CONTENT.
+     *
+     * ContentController::init() fires this hook on the page before it checks canView(), so the visitor
+     * gets the site's normal "page not found" response (the 404 ErrorPage, when one exists) instead of a
+     * login form. This is the check that protects a page opened by its URL: the page is looked up by
+     * SiteTree::get_by_link(), a query on SiteTree, which the augmentSQL() filter below does not reach
+     * when the extension is applied to a SiteTree subclass.
+     *
+     * @param ContentController $controller
+     */
+    protected function contentcontrollerInit($controller)
     {
-        parent::augmentSQL($query, $dataQuery);
+        if ( Permission::check('VIEW_DRAFT_CONTENT') ) {
+            return;
+        }
+        if ( $this->owner->getScheduledStatus() || $this->owner->getExpiredStatus() ) {
+            $controller->httpError(404);
+        }
+    }
+
+    /**
+     * The current controller, or null when none is on the stack.
+     *
+     * Framework 5's Controller::curr() raises E_USER_WARNING "No current controller available" on an
+     * empty stack (CLI scripts, queue runners), and augmentSQL() runs on every query; framework 6
+     * removed has_curr() and returns null silently. Drop the has_curr() branch when ^5 is dropped.
+     */
+    private static function currentController(): ?Controller
+    {
+        # has_curr() is deprecated in framework 5.4 through noticeWithNoReplacment(), which wraps the notice in
+        # withSuppressedNotice(): it is only output with Deprecation::enable(true), and de-duplicated per
+        # message, so at most one line per process - not one per query. With deprecations enabled, notice()
+        # still runs debug_backtrace() on every call, so once per filtered query: a dev-only cost, no extra
+        # output. There is no non-deprecated way on 5
+        # to ask for the controller without the warning, so the call stays.
+        if ( method_exists(Controller::class, 'has_curr') && !Controller::has_curr() ) {
+            return null;
+        }
+
+        return Controller::curr();
+    }
+
+    # ?DataQuery: an implicitly nullable parameter is deprecated as of PHP 8.4
+    public function augmentSQL(SQLSelect $query, ?DataQuery $dataQuery = null)
+    {
+        # Extension has no augmentSQL(); the DataExtension/SiteTreeExtension parent was an empty stub
+//        parent::augmentSQL($query, $dataQuery);
+        # Never filter a lazy load, see augmentLoadLazyFields() below
+        if ( $dataQuery && $dataQuery->getQueryParam('SoftScheduler.LazyLoad') ) {
+            return;
+        }
         $stage = Versioned::get_stage();
-        if ( Controller::curr() instanceof LeftAndMain ) {
+//        if ( Controller::curr() instanceof LeftAndMain ) {
+        if ( self::currentController() instanceof LeftAndMain ) {
             return;
         }
         if ( $stage === 'Live' || !Permission::check('VIEW_DRAFT_CONTENT') ) {
-            $query->addWhere('("Embargo" IS NULL OR "Embargo" < NOW()) AND ("Expiry" IS NULL OR "Expiry" > NOW())');
+            # Compare against Silverstripe's clock, not the database server's NOW(). Datetimes are stored
+            # in PHP's time zone, while NOW() uses the MySQL session time zone, so a UTC database behind a
+            # Europe/Amsterdam site shifted every embargo and expiry by one or two hours. It also ignored
+            # DBDatetime::set_mock_now(). date() rather than DBDatetime::Format(), which is locale-aware.
+            $now = date('Y-m-d H:i:s', DBDatetime::now()->getTimestamp());
+//            $query->addWhere('("Embargo" IS NULL OR "Embargo" < NOW()) AND ("Expiry" IS NULL OR "Expiry" > NOW())');
+            $query->addWhere([
+                '("Embargo" IS NULL OR "Embargo" < ?) AND ("Expiry" IS NULL OR "Expiry" > ?)' => [$now, $now],
+            ]);
+        }
+    }
+
+    /**
+     * Mark lazy-load queries so augmentSQL() leaves them alone.
+     *
+     * A record fetched through a query on a parent class (SiteTree::get(), SiteTree::get_by_link(), a
+     * menu or a Children() list) arrives without this class's own columns; DataObject::loadLazyFields()
+     * fetches them later with a query on this class, and fires augmentSQL() on it. Filtering that query
+     * does not hide the record, which is already loaded; it only makes the lazy load come back empty, so
+     * Embargo, Expiry and every other column of the extended class read as null on a scheduled or expired
+     * page - which in turn made the page look unscheduled to every check in this class.
+     */
+    protected function augmentLoadLazyFields(SQLSelect &$query, ?DataQuery &$dataQuery, $dataObject)
+    {
+        if ( $dataQuery ) {
+            $dataQuery->setQueryParam('SoftScheduler.LazyLoad', true);
         }
     }
 
 }
-

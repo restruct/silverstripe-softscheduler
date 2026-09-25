@@ -2,18 +2,50 @@
     "name": "restruct/silverstripe-softscheduler",
     "description": "Adds a very simple way to schedule (Embargo/Expire) SiteTree items",
     "type": "silverstripe-vendormodule",
+    "homepage": "https://github.com/restruct/silverstripe-softscheduler",
     "keywords": ["silverstripe", "embargo", "expiry", "sitetree", "schedule"],
     "license": "MIT",
     "authors": [ { "name": "Restruct", "email": "dev@restruct.nl", "homepage": "https://restruct.nl" } ],
     "require": {
-        "silverstripe/framework": "^4.3"
+        "php": "^8.1",
+        "silverstripe/framework": "^5 || ^6",
+        "silverstripe/cms": "^5 || ^6",
+        "silverstripe/vendor-plugin": "^2 || ^3"
+    },
+    "require-dev": {
+        "silverstripe/recipe-testing": "^3 || ^4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Restruct\\SilverStripe\\SoftScheduler\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Restruct\\SoftScheduler\\Tests\\": "tests/"
+        }
     },
 	"extra": {
         "expose": [
-            "client/images",
-            "client/dist/css"
+            "client/images"
         ],
-		"installer-name": "softscheduler"
-	}
-
+		"installer-name": "softscheduler",
+        "branch-alias": {
+            "dev-main": "3.x-dev"
+        }
+	},
+    "config": {
+        "allow-plugins": {
+            "composer/installers": true,
+            "silverstripe/vendor-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/restruct"
+        }
+    ]
 }
