@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.1 (2026-10-02)
+
+### Fixed
+
+- **Silverstripe 6: the page edit form failed with "a field called 'Embargo' appears twice"** (#3).
+  On Silverstripe 6, `SiteTree::getCMSFields()` scaffolds a field for every database field of the page
+  type, including the `Embargo` and `Expiry` fields this extension adds, and the extension then added
+  its own pair inside the schedule toggle. The extension now removes the scaffolded pair first.
+  Silverstripe 5 scaffolds nothing there and is unaffected.
+
 ## 3.0.0 (2026-09-25)
 
 **Silverstripe 5 and 6.** One line supports both. Silverstripe 4 stays on the `2.0` tag; nothing here

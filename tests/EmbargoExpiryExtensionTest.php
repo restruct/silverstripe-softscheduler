@@ -129,6 +129,25 @@ class EmbargoExpiryExtensionTest extends SapphireTest
         $this->assertInstanceOf(DatetimeField::class, $toggle->fieldByName('Expiry'));
     }
 
+    /**
+     * Regression test for issue #3: on Silverstripe 6 the page edit form failed with "a field called
+     * 'Embargo' appears twice", because SiteTree::getCMSFields() scaffolds the owner's db fields
+     * (extension-added ones included) and the extension then added its own Embargo/Expiry fields.
+     */
+    public function testCmsFieldsHoldEachScheduleDateOnlyOnce()
+    {
+        $fields = SchedPage::create()->getCMSFields();
+
+        # dataFields() is what the edit form calls (via dataFieldByName); it throws a RuntimeException
+        # on a duplicate field name, which fieldByName() alone never surfaces
+        $dataFields = $fields->dataFields();
+
+        # The one Embargo/Expiry field left is the extension's own, inside the toggle
+        $toggle = $fields->fieldByName('Root.Main.SoftScheduler');
+        $this->assertSame($toggle->fieldByName('Embargo'), $dataFields['Embargo']);
+        $this->assertSame($toggle->fieldByName('Expiry'), $dataFields['Expiry']);
+    }
+
     public function testStatusHelpersFollowTheDates()
     {
         $scheduled = $this->publishedPage('scheduled', '2030-07-01 00:00:00', null);
