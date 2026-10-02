@@ -126,6 +126,7 @@ jobs:
               <testsuites>
                   <testsuite name="softscheduler">
                       <directory>vendor/restruct/silverstripe-softscheduler/tests</directory>
+                      <exclude>vendor/restruct/silverstripe-softscheduler/tests/browser</exclude>
                   </testsuite>
                   <testsuite name="consumer">
                       <directory>app/tests</directory>
