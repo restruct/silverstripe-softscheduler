@@ -18,12 +18,11 @@ test('the site tree flags scheduled and expired pages', async ({ page }) => {
     }
 });
 
-test('an expiry set and published in the CMS takes the page off the front end', async ({ page, browser, baseURL }, testInfo) => {
-    // FIXME https://github.com/restruct/silverstripe-softscheduler/issues/3
-    // On Silverstripe 6 the page edit form of a page type with the extension fails with a 500
+test('an expiry set and published in the CMS takes the page off the front end', async ({ page, browser, baseURL }) => {
+    // Regression guard for https://github.com/restruct/silverstripe-softscheduler/issues/3 (fixed in
+    // 3.0.1): on Silverstripe 6 the page edit form of a page type with the extension failed with a 500
     // ("a field called 'Embargo' appears twice"): SiteTree scaffolds Embargo/Expiry there and the
-    // extension adds them again inside its toggle. Silverstripe 5 is not affected.
-    test.fixme(testInfo.project.name === 'ss6', 'SS6 page edit form fails (issue #3)');
+    // extension added them again inside its toggle. Silverstripe 5 was not affected.
     const anonymous = await visitor(browser, baseURL);
     expect((await anonymous.get(urlOf('Sched edit'))).status(), 'visible before').toBe(200);
 

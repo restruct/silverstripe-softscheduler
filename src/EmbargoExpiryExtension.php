@@ -54,6 +54,15 @@ class EmbargoExpiryExtension extends Extension
         $unpublishDate = DatetimeField::create("Expiry", _t("Scheduler.Expiry", "Page expires on"))
             ->setDescription(_t("Scheduler.LeaveEmptyExpire", "Leave empty to leave page published indefinitely"));
 
+        # Silverstripe 6: SiteTree::getCMSFields() ends in DataObject::getCMSFields(), which scaffolds a
+        # field for every db field in the owner's config - extension-added ones included - so Embargo and
+        # Expiry are already in Root.Main before updateCMSFields() runs. Adding ours as well gave the form
+        # two fields per name and the page edit form failed ("a field called 'Embargo' appears twice", #3).
+        # Removed by name rather than via scaffold_cms_fields_settings.ignoreFields, so it also holds when
+        # a project overrides those settings. On Silverstripe 5 SiteTree builds its fields explicitly and
+        # scaffolds nothing, so there is nothing to remove and this is a no-op.
+        $fields->removeByName(['Embargo', 'Expiry']);
+
         # insertBefore(name, field): the (field, name) order of Silverstripe 3 is a TypeError on 5 and 6
         $fields->insertBefore(
             'Content',
