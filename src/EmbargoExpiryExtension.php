@@ -325,8 +325,10 @@ class EmbargoExpiryExtension extends Extension
         if ( self::currentController() instanceof LeftAndMain ) {
             return;
         }
-        # Never filter while Versioned removes a record from a stage, see onBeforeUnpublish() below
-        if ( self::$unfilteredDepth > 0 ) {
+        # Never filter while Versioned removes a record from a stage, see onBeforeUnpublish() below.
+        # The counter alone is not trusted: the stack check runs only while it is raised, so it costs
+        # nothing on ordinary queries.
+        if ( self::$unfilteredDepth > 0 && self::insideUnpublishOrArchive() ) {
             return;
         }
         if ( $stage === 'Live' || !Permission::check('VIEW_DRAFT_CONTENT') ) {
@@ -365,9 +367,9 @@ class EmbargoExpiryExtension extends Extension
      * static because augmentSQL() runs on the singleton's extension instance, not on the page's.
      *
      * Versioned offers no hook that wraps the operation, so an exception thrown between the before- and
-     * after-hook leaves the counter raised for the rest of that process (the filter stays off). An
-     * unpublish that throws is a failed request or a broken job already; this is the price of not
-     * re-implementing Versioned's delete here.
+     * after-hook skips the after-hook and leaves the counter raised. Left alone, that would switch the
+     * filter off for the rest of the process - in a queue runner, for every later job. insideUnpublishOrArchive()
+     * catches that case and resets the counter.
      *
      * @var int
      */
@@ -396,8 +398,11 @@ class EmbargoExpiryExtension extends Extension
 
     /**
      * Same as onBeforeUnpublish(), for the whole of doArchive(): it unpublishes first and then deletes the
-     * draft, and SiteTree::onBeforeDelete() lists the children to delete with them, which on the draft
-     * stage is filtered too for everyone without VIEW_DRAFT_CONTENT.
+     * draft. That matters only when the extension is applied to SiteTree itself: SiteTree::onBeforeDelete()
+     * lists the children to delete along with the page through AllChildren(), a query on the base class
+     * SiteTree, and only then does augmentSQL() filter it (on the draft stage too, for everyone without
+     * VIEW_DRAFT_CONTENT), leaving a scheduled child behind. Applied to a subclass, the draft delete runs
+     * no query on the extended class and these two hooks change nothing.
      *
      * Versioned passes itself as the argument; it is not needed here.
      */
@@ -409,6 +414,28 @@ class EmbargoExpiryExtension extends Extension
     protected function onAfterArchive($versioned = null)
     {
         self::$unfilteredDepth = max(0, self::$unfilteredDepth - 1);
+    }
+
+    /**
+     * Whether Versioned::doUnpublish() or doArchive() is really on the call stack right now.
+     *
+     * Called only while the counter is raised. If neither frame is there, an earlier unpublish or archive
+     * threw between its before- and after-hook and has unwound; the counter is stale, so it is reset to
+     * zero and the query that asked is filtered as usual.
+     */
+    private static function insideUnpublishOrArchive(): bool
+    {
+        # IGNORE_ARGS: only class and function names are needed, and it keeps the backtrace cheap
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
+            # is_a() with a class string: also matches a project's subclass of Versioned
+            if ( isset($frame['class']) && in_array($frame['function'], ['doUnpublish', 'doArchive'], true)
+                && is_a($frame['class'], Versioned::class, true) ) {
+                return true;
+            }
+        }
+        self::$unfilteredDepth = 0;
+
+        return false;
     }
 
 }

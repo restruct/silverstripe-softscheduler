@@ -8,9 +8,14 @@
   `doUnpublish()` and `doArchive()` called from a BuildTask, a queued job or `dev/build` removed the
   draft but not the published copy of a page under embargo or past its expiry, so the page became
   visible again once its embargo passed. Versioned finds the published record through a query on the
-  page's class, and the extension's date filter hid it from that query. The filter is now lifted while
-  a page is being unpublished or archived; what visitors can see is unchanged. Unpublishing and
-  archiving from the CMS were not affected.
+  page's class, and the extension's date filter hid it from that query. The filter is now lifted for
+  the duration of a `doUnpublish()` or `doArchive()` call. Code that runs inside that call, such as
+  another extension's unpublish or delete hook (a sitemap or search reindex, say), can therefore see
+  scheduled and expired records of the same class; outside the call nothing changes, also when an
+  unpublish throws half-way. Unpublishing and archiving from the CMS were not affected.
+- **With the extension applied to `SiteTree` itself, unpublishing or archiving a page outside the CMS
+  left its scheduled or expired child pages behind** (#4). `SiteTree` lists the children to remove
+  along with a page through a query that the same filter applied to; they are now removed too.
 
 ## 3.0.1 (2026-10-02)
 
