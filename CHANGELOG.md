@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.0.2 (unreleased)
+
+### Fixed
+
+- **Unpublishing or archiving a scheduled or expired page outside the CMS left it on the Live stage** (#4).
+  `doUnpublish()` and `doArchive()` called from a BuildTask, a queued job or `dev/build` removed the
+  draft but not the published copy of a page under embargo or past its expiry, so the page became
+  visible again once its embargo passed. Versioned finds the published record through a query on the
+  page's class, and the extension's date filter hid it from that query. The filter is now lifted while
+  a page is being unpublished or archived; what visitors can see is unchanged. Unpublishing and
+  archiving from the CMS were not affected.
+
 ## 3.0.1 (2026-10-02)
 
 ### Fixed

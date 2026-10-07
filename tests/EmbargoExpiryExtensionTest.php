@@ -15,6 +15,7 @@ use SilverStripe\Forms\DatetimeField;
 use SilverStripe\Forms\ToggleCompositeField;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DataObjectSchema;
+use SilverStripe\ORM\DB;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Security\Group;
 use SilverStripe\Security\InheritedPermissions;
@@ -455,5 +456,108 @@ class EmbargoExpiryExtensionTest extends SapphireTest
 
         $this->assertSame(['expired', 'plain', 'scheduled'], $segments);
         $this->assertTrue($canView);
+    }
+
+    /**
+     * Count the rows a page has in the given stage, by plain SQL: the ORM query is exactly what the
+     * extension filters, so it cannot be used to check whether a row is really gone.
+     */
+    private function rowsOnStage(int $id, string $stage): int
+    {
+        $suffix = $stage === Versioned::LIVE ? '_Live' : '';
+        $base = DataObject::getSchema()->baseDataTable(SchedPage::class) . $suffix;
+        $own = DataObject::getSchema()->tableName(SchedPage::class) . $suffix;
+
+        return (int) DB::prepared_query("SELECT COUNT(*) FROM \"$base\" WHERE \"ID\" = ?", [$id])->value()
+            + (int) DB::prepared_query("SELECT COUNT(*) FROM \"$own\" WHERE \"ID\" = ?", [$id])->value();
+    }
+
+    /**
+     * Regression (#4): doUnpublish() outside the CMS (a BuildTask, a queued job, dev/build) left a scheduled
+     * or expired page on the Live stage. Versioned looks the Live record up with a query on the page's own
+     * class before deleting it, the Live filter hid the record from that lookup, and nothing was deleted.
+     */
+    public function testUnpublishOutsideTheCmsRemovesScheduledAndExpiredPagesFromLive()
+    {
+        $pages = [
+            'scheduled' => $this->publishedPage('scheduled', '2030-07-01 00:00:00', null),
+            'expired' => $this->publishedPage('expired', null, '2030-06-01 00:00:00'),
+            'plain' => $this->publishedPage('plain', null, null),
+        ];
+
+        foreach ($pages as $segment => $page) {
+            $this->assertSame(2, $this->rowsOnStage($page->ID, Versioned::LIVE), "$segment starts on Live");
+            $page->doUnpublish();
+            $this->assertSame(0, $this->rowsOnStage($page->ID, Versioned::LIVE), "$segment is off Live");
+            $this->assertSame(2, $this->rowsOnStage($page->ID, Versioned::DRAFT), "$segment keeps its draft");
+            $this->assertFalse($page->isPublished(), "$segment reports unpublished");
+        }
+    }
+
+    /**
+     * Regression (#4): doArchive() outside the CMS removed the draft but left a scheduled or expired page
+     * on the Live stage, where it became visible again once its embargo passed.
+     */
+    public function testArchiveOutsideTheCmsRemovesScheduledAndExpiredPagesFromBothStages()
+    {
+        $pages = [
+            'scheduled' => $this->publishedPage('scheduled', '2030-07-01 00:00:00', null),
+            'expired' => $this->publishedPage('expired', null, '2030-06-01 00:00:00'),
+            'plain' => $this->publishedPage('plain', null, null),
+        ];
+
+        foreach ($pages as $segment => $page) {
+            $page->doArchive();
+            $this->assertSame(0, $this->rowsOnStage($page->ID, Versioned::LIVE), "$segment is off Live");
+            $this->assertSame(0, $this->rowsOnStage($page->ID, Versioned::DRAFT), "$segment is off draft");
+            $this->assertTrue($page->isArchived(), "$segment reports archived");
+        }
+    }
+
+    /**
+     * The fix for #4 lifts the Live filter only for the duration of an unpublish or archive. Once those
+     * have finished, a visitor's queries must be filtered exactly as before.
+     */
+    public function testTheLiveFilterStillAppliesAfterAnUnpublishOrArchive()
+    {
+        $this->publishedPage('scheduled-a', '2030-07-01 00:00:00', null)->doUnpublish();
+        $this->publishedPage('scheduled-b', '2030-07-01 00:00:00', null)->doArchive();
+        $this->publishedPage('still-scheduled', '2030-07-01 00:00:00', null);
+        $this->publishedPage('still-expired', null, '2030-06-01 00:00:00');
+        $this->publishedPage('plain', null, null);
+
+        $segments = $this->inStage(Versioned::LIVE, function () {
+            return SchedPage::get()->sort('URLSegment')->column('URLSegment');
+        });
+
+        $this->assertSame(['plain'], $segments);
+    }
+
+    /**
+     * Unpublishing and archiving from the CMS (a LeftAndMain on the stack) worked before #4 was fixed,
+     * because the filter is off there anyway; it must keep working.
+     */
+    public function testUnpublishAndArchiveInsideTheCmsStillRemoveScheduledPages()
+    {
+        $unpublish = $this->publishedPage('unpublish-me', '2030-07-01 00:00:00', null);
+        $archive = $this->publishedPage('archive-me', null, '2030-06-01 00:00:00');
+
+        $this->logInWithPermission('ADMIN');
+        $request = new HTTPRequest('GET', '/admin/pages');
+        $request->setSession(new Session([]));
+        $cms = LeftAndMain::create();
+        $cms->setRequest($request);
+        $cms->pushCurrent();
+        try {
+            $unpublish->doUnpublish();
+            $archive->doArchive();
+        } finally {
+            $cms->popCurrent();
+        }
+
+        $this->assertSame(0, $this->rowsOnStage($unpublish->ID, Versioned::LIVE));
+        $this->assertSame(2, $this->rowsOnStage($unpublish->ID, Versioned::DRAFT));
+        $this->assertSame(0, $this->rowsOnStage($archive->ID, Versioned::LIVE));
+        $this->assertSame(0, $this->rowsOnStage($archive->ID, Versioned::DRAFT));
     }
 }
