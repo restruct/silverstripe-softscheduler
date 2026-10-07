@@ -325,6 +325,12 @@ class EmbargoExpiryExtension extends Extension
         if ( self::currentController() instanceof LeftAndMain ) {
             return;
         }
+        # Never filter while Versioned removes a record from a stage, see onBeforeUnpublish() below.
+        # The counter alone is not trusted: the stack check runs only while it is raised, so it costs
+        # nothing on ordinary queries.
+        if ( self::$unfilteredDepth > 0 && self::insideUnpublishOrArchive() ) {
+            return;
+        }
         if ( $stage === 'Live' || !Permission::check('VIEW_DRAFT_CONTENT') ) {
             # Compare against Silverstripe's clock, not the database server's NOW(). Datetimes are stored
             # in PHP's time zone, while NOW() uses the MySQL session time zone, so a UTC database behind a
@@ -353,6 +359,83 @@ class EmbargoExpiryExtension extends Extension
         if ( $dataQuery ) {
             $dataQuery->setQueryParam('SoftScheduler.LazyLoad', true);
         }
+    }
+
+    /**
+     * How many unpublish/archive operations are in progress; augmentSQL() does not filter while this is
+     * above zero. A counter rather than a flag because doArchive() runs doUnpublish() inside it, and a
+     * static because augmentSQL() runs on the singleton's extension instance, not on the page's.
+     *
+     * Versioned offers no hook that wraps the operation, so an exception thrown between the before- and
+     * after-hook skips the after-hook and leaves the counter raised. Left alone, that would switch the
+     * filter off for the rest of the process - in a queue runner, for every later job. insideUnpublishOrArchive()
+     * catches that case and resets the counter.
+     *
+     * @var int
+     */
+    private static $unfilteredDepth = 0;
+
+    /**
+     * Lift the Live filter while Versioned unpublishes this record (#4).
+     *
+     * Versioned::doUnpublish() finds the Live record to delete with a query on the record's own class.
+     * Outside the CMS (BuildTasks, queued jobs, dev/build) augmentSQL() filters that query, so for a
+     * scheduled or expired page the lookup came back empty and the Live row was silently left in place:
+     * the page stayed published, and became visible again once its embargo passed. The filter decides
+     * what visitors may READ; it has no business hiding a record from the code that is removing it.
+     * Inside the CMS nothing changes, as augmentSQL() does not filter there anyway.
+     */
+    protected function onBeforeUnpublish()
+    {
+        self::$unfilteredDepth++;
+    }
+
+    protected function onAfterUnpublish()
+    {
+        # max(): never go negative, should an after-hook ever fire without its before-hook
+        self::$unfilteredDepth = max(0, self::$unfilteredDepth - 1);
+    }
+
+    /**
+     * Same as onBeforeUnpublish(), for the whole of doArchive(): it unpublishes first and then deletes the
+     * draft. That matters only when the extension is applied to SiteTree itself: SiteTree::onBeforeDelete()
+     * lists the children to delete along with the page through AllChildren(), a query on the base class
+     * SiteTree, and only then does augmentSQL() filter it (on the draft stage too, for everyone without
+     * VIEW_DRAFT_CONTENT), leaving a scheduled child behind. Applied to a subclass, the draft delete runs
+     * no query on the extended class and these two hooks change nothing.
+     *
+     * Versioned passes itself as the argument; it is not needed here.
+     */
+    protected function onBeforeArchive($versioned = null)
+    {
+        self::$unfilteredDepth++;
+    }
+
+    protected function onAfterArchive($versioned = null)
+    {
+        self::$unfilteredDepth = max(0, self::$unfilteredDepth - 1);
+    }
+
+    /**
+     * Whether Versioned::doUnpublish() or doArchive() is really on the call stack right now.
+     *
+     * Called only while the counter is raised. If neither frame is there, an earlier unpublish or archive
+     * threw between its before- and after-hook and has unwound; the counter is stale, so it is reset to
+     * zero and the query that asked is filtered as usual.
+     */
+    private static function insideUnpublishOrArchive(): bool
+    {
+        # IGNORE_ARGS: only class and function names are needed, and it keeps the backtrace cheap
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
+            # is_a() with a class string: also matches a project's subclass of Versioned
+            if ( isset($frame['class']) && in_array($frame['function'], ['doUnpublish', 'doArchive'], true)
+                && is_a($frame['class'], Versioned::class, true) ) {
+                return true;
+            }
+        }
+        self::$unfilteredDepth = 0;
+
+        return false;
     }
 
 }
