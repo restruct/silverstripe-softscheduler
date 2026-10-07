@@ -52,9 +52,9 @@ class SchedBPage extends Page
         # Old copies are removed with plain SQL, from every stage table. The ORM cannot be used here:
         # the extension's own query filter (augmentSQL) hides scheduled and expired pages from
         # queries on this class on the Live stage, and from everyone without VIEW_DRAFT_CONTENT -
-        # which includes this CLI dev/build - so self::get() never finds them, and doArchive() on a
-        # copy found through SiteTree leaves the Live row behind (Versioned looks the Live record up
-        # through a query on this class, which comes back empty).
+        # which includes this CLI dev/build - so self::get() never finds them. (doArchive() on a copy
+        # found through SiteTree used to leave the Live row behind as well; that was #4, fixed in
+        # 3.0.2. The plain SQL is still needed because reads stay filtered.)
         $titles = array_keys(self::SEEDS);
         $placeholders = DB::placeholders($titles);
         $ids = DB::prepared_query(
